@@ -1,11 +1,11 @@
 import yt_dlp
+import sys
 
 class MyLogger:
     """
     Custom logger class to handle yt_dlp internal messages.
     """
     def debug(self, msg):
-        # Filter out purely technical debug messages to keep the console clean
         if not msg.startswith('[debug] '):
             print(f"[INFO] {msg}")
 
@@ -17,49 +17,97 @@ class MyLogger:
 
 def progress_hook(d):
     """
-    Function to track and display the progress of each individual video.
+    Displays progress during the download process.
     """
     if d['status'] == 'downloading':
-        # Extracts filename and percentage string
-        filename = d.get('filename', 'video')
         percent = d.get('_percent_str', '0%')
-        print(f"📥 Downloading: {filename} | Progress: {percent}", end='\r')
+        speed = d.get('_speed_str', 'N/A')
+        print(f"📥 Progress: {percent} | Speed: {speed}", end='\r')
     
     if d['status'] == 'finished':
-        print(f"\n✅ Finished: {d['filename']}")
+        print(f"\n✅ Video download finished.")
 
-def download_from_tiktok_user(user, total_videos=10):
+def get_profile_data(user):
     """
-    Main function to download a specific number of videos from a TikTok profile.
+    Scans the profile to get the list of available videos without downloading them yet.
     """
+    print(f"🔍 Scanning @{user}'s profile... This may take a few seconds.")
     profile_url = f'https://www.tiktok.com/@{user}'
     
-    # Configuration options for yt-dlp
     ydl_opts = {
-        'format': 'best',
-        # 'playlist_items' defines the range of videos to fetch (e.g., '1-10')
-        'playlist_items': f'1-{total_videos}',
-        # Saves files in a folder named after the uploader
-        'outtmpl': f'%(uploader)s/%(title).50s.%(ext)s', 
-        'noplaylist': False,
-        'logger': MyLogger(),
-        'progress_hooks': [progress_hook],
+        'extract_flat': True,  # Essential: only lists the videos, doesn't download them.
+        'quiet': True,
+        'no_warnings': True,
     }
 
-    try:
-        print(f"--- Starting process for user: @{user} ---")
-        print(f"--- Target: Latest {total_videos} videos ---\n")
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([profile_url])
-            
-        print(f"\n--- Task Completed. Check the '{user}' folder ---")
-    except Exception as e:
-        print(f"\n❌ A critical error occurred: {e}")
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(profile_url, download=False)
+            if 'entries' in info:
+                # Return the full list of video entries found
+                return list(info['entries'])
+            return []
+        except Exception as e:
+            print(f"❌ Error accessing profile: {e}")
+            return None
 
-# --- EXECUTION ---
-if __name__ == "__main__":
-    target_user = input("Enter TikTok username (without @): ")
-    video_count = input("Enter number of videos to download (e.g., 5): ")
+def download_selected_videos(user, video_list, amount):
+    """
+    Downloads the top 'N' videos from the provided list in High Definition.
+    """
+    # Slice the list to match the user's requested amount
+    videos_to_process = video_list[:amount]
     
-    download_from_tiktok_user(target_user, total_videos=video_count)
+    # Configuration for high-quality, watermark-free downloads
+    ydl_opts = {
+        'format': 'bestvideo+bestaudio/best', # HD Quality
+        'merge_output_format': 'mp4',
+        'outtmpl': f'{user}/%(title).50s.%(ext)s', 
+        'logger': MyLogger(),
+        'progress_hooks': [progress_hook],
+        'sleep_interval': 3,       # Random pause between 3-7s to avoid bans
+        'max_sleep_interval': 7,
+    }
+
+    print(f"\n🚀 Starting download of {len(videos_to_process)} videos...")
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        for i, video in enumerate(videos_to_process, 1):
+            print(f"\n[Video {i}/{len(videos_to_process)}] Processing: {video.get('title', 'No Title')[:40]}...")
+            try:
+                # Download using the specific video URL from the metadata
+                ydl.download([video['url']])
+            except Exception as e:
+                print(f"⚠️ Could not download video {i}: {e}")
+
+# --- MAIN EXECUTION FLOW ---
+if __name__ == "__main__":
+    # Step 1: User Input for the profile
+    target_user = input("Enter TikTok username (without @): ").strip().lower()
+    
+    # Step 2: Fetch metadata and show total
+    all_videos = get_profile_data(target_user)
+    
+    if all_videos is not None:
+        total_found = len(all_videos)
+        
+        if total_found == 0:
+            print("❌ No public videos found or the profile is private.")
+            sys.exit()
+            
+        print(f"✅ Found {total_found} public videos in @{target_user}'s profile.")
+        
+        # Step 3: Ask for the specific amount to download
+        try:
+            requested = input(f"How many videos do you want to download? (1-{total_found}): ")
+            requested_count = int(requested)
+            
+            if requested_count <= 0:
+                print("Invalid number. Operation cancelled.")
+            else:
+                # Step 4: Run the actual download
+                download_selected_videos(target_user, all_videos, requested_count)
+                print(f"\n✨ All tasks completed. Files are in the '{target_user}' folder.")
+                
+        except ValueError:
+            print("❌ Invalid input. Please enter a whole number.")

@@ -3,15 +3,19 @@
 A lightweight Python-based automation tool that allows you to download a specific number of videos from any public TikTok profile without watermarks.
 
 ## 🚀 Features
-* **Watermark-Free:** Downloads high-quality videos without the TikTok logo.
-* **Parametrized:** You can choose exactly how many videos you want to download.
-* **Real-time Logging:** Provides live feedback and progress bars for each download.
-* **Automatic Organization:** Saves videos in folders named after the TikTok username.
+* **Interactive Flow:** Scans the profile first, shows the total video count, and then asks you how many to download.
+* **HD Quality:** Automatically fetches the best video and audio streams available.
+* **No Watermark:** Downloads clean videos directly from TikTok's servers.
+* **Anti-Ban Protection:** Includes random sleep intervals between downloads to mimic human behavior.
 
 ## 🛠️ Prerequisites
-Before running the script, ensure you have the following installed:
-* [Python 3.7+](https://www.python.org/downloads/)
-* [FFmpeg](https://ffmpeg.org/download.html) (Recommended for high-quality video processing)
+To ensure HD quality and file merging, you need:
+1. **Python 3.7+**
+2. **yt-dlp library:** `pip install -U yt-dlp`
+3. **FFmpeg:** Required for merging HD video and audio.
+   * **Windows:** Install via [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add to PATH.
+   * **Mac:** `brew install ffmpeg`
+   * **Linux:** `sudo apt install ffmpeg`
 
 ## 📦 Installation
 
