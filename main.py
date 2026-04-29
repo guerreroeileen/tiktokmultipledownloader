@@ -1,5 +1,13 @@
 import yt_dlp
+from yt_dlp.networking.impersonate import ImpersonateTarget
 import sys
+import traceback
+
+try:
+    import curl_cffi
+    HAS_IMPERSONATE = True
+except ImportError:
+    HAS_IMPERSONATE = False
 
 class MyLogger:
     """
@@ -35,21 +43,30 @@ def get_profile_data(user):
     profile_url = f'https://www.tiktok.com/@{user}'
     
     ydl_opts = {
-        'extract_flat': True,  # Essential: only lists the videos, doesn't download them.
+        'extract_flat': True,
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {'tiktok': {'api_hostname': 'api-h2.tiktokv.com'}},
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
+    if HAS_IMPERSONATE:
+        ydl_opts['impersonate'] = ImpersonateTarget('chrome')
+    else:
+        ydl_opts['user_agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(profile_url, download=False)
             if 'entries' in info:
-                # Return the full list of video entries found
                 return list(info['entries'])
             return []
-        except Exception as e:
-            print(f"❌ Error accessing profile: {e}")
-            return None
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Error accessing profile: {e}")
+        if not error_msg:
+            print("⚠️ The error message is empty. Printing full traceback:")
+            traceback.print_exc()
+        return None
 
 def download_selected_videos(user, video_list, amount):
     """
@@ -60,22 +77,27 @@ def download_selected_videos(user, video_list, amount):
     
     # Configuration for high-quality, watermark-free downloads
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best', # HD Quality
+        'format': 'bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
-        'outtmpl': f'{user}/%(title).50s.%(ext)s', 
+        'outtmpl': f'download/{user}/%(title).50s.%(ext)s',
         'logger': MyLogger(),
         'progress_hooks': [progress_hook],
-        'sleep_interval': 3,       # Random pause between 3-7s to avoid bans
+        'sleep_interval': 3,
         'max_sleep_interval': 7,
+        'extractor_args': {'tiktok': {'api_hostname': 'api-h2.tiktokv.com'}},
     }
 
+    if HAS_IMPERSONATE:
+        ydl_opts['impersonate'] = ImpersonateTarget('chrome')
+    else:
+        ydl_opts['user_agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
     print(f"\n🚀 Starting download of {len(videos_to_process)} videos...")
-    
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         for i, video in enumerate(videos_to_process, 1):
             print(f"\n[Video {i}/{len(videos_to_process)}] Processing: {video.get('title', 'No Title')[:40]}...")
             try:
-                # Download using the specific video URL from the metadata
                 ydl.download([video['url']])
             except Exception as e:
                 print(f"⚠️ Could not download video {i}: {e}")
