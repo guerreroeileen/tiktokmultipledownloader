@@ -36,7 +36,7 @@ To ensure HD quality and file merging, you need:
 
 3. Enter the number of videos you wish to download.
 
-note: it will create a folder ./username which contains all the downloaded videos
+note: videos are saved to `./download/{username}/`
 
 
 ## ⚖️ Disclaimer
